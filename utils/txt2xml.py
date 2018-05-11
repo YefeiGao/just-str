@@ -10,7 +10,6 @@ image_new_path = "E:\\dataset\\icpr2018\\icpr2018_10k_image_renamed\\"
 ann_path = "E:\\dataset\\icpr2018\\icpr2018_10k_anno_txt\\"
 xml_path = "E:\\dataset\\icpr2018\\icpr2018_10k_anno_xml\\"
 
-
 if not os.path.exists(xml_path):
     os.mkdir(xml_path)
 
