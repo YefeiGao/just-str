@@ -4,7 +4,7 @@ from xml.dom.minidom import Document
 import os
 import os.path
 from PIL import Image
-
+import cv2
 img_path = "E:\\dataset\\icpr2018\\icpr2018_10k_image\\"
 image_new_path = "E:\\dataset\\icpr2018\\icpr2018_10k_image_renamed\\"
 ann_path = "E:\\dataset\\icpr2018\\icpr2018_10k_anno_txt\\"
@@ -172,10 +172,14 @@ def main():
             print(file + "-->start!")
             img_name = os.path.splitext(file)[0] + '.jpg'
             fileimgpath = img_path + img_name
-            im = Image.open(fileimgpath)
+            im = cv2.imread(fileimgpath)
+            if im.shape[2] == 1:
+                cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+                cv2.imwrite(fileimgpath, img)
+            # im = Image.open(fileimgpath)
             # im.save(new_fileimagepath)
-            width = int(im.size[0])
-            height = int(im.size[1])
+            height = int(im.shape[0])
+            width = int(im.shape[1])
             filelabel = open(ann_path + file, "r",encoding='utf-8')
             # lines = filelabel.read().split('\n')
             # obj = lines[:len(lines) - 1]

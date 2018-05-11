@@ -8,3 +8,5 @@
 - This script can be used to transform the annocation information with txt file to Pascal VOC style xml file. 
 3. concatenate.py
 - This script can be used to cancatenate image file path and corresponding xml file path for creating train.txt and test.txt files.
+4. check_image_channel.py
+- This script can be used to validate image struct for date cleaning process.
