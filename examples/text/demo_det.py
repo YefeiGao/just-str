@@ -20,12 +20,15 @@ import caffe
 caffe.set_device(0)
 caffe.set_mode_gpu()
 
+# global transformer
+
 config = {
 	'model_def' : './models/deploy.prototxt',
 	'model_weights' : './models/model_icdar15.caffemodel',
-	'img_dir' : './demo_images/',
-	'image_name' : 'demo.jpg',
-	'det_visu_path' : './demo_images/demo_det_result.jpg',
+	# 'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_30000.caffemodel',
+	'img_dir' : './demo_images/data/',
+	'image_name' : 't01b494119fe46bdaff_new.jpg',
+	'det_visu_path' : './demo_images/detection_result/',
 	'det_save_dir' : './demo_images/detection_result/',
 	'crop_dir' : './demo_images/crops/',
 	'input_height' : 768,
@@ -48,10 +51,11 @@ def prepare_network(config):
 
 	net.blobs['data'].reshape(1,3,config['input_height'], config['input_width'])
 
-	image=caffe.io.load_image(os.path.join(config['img_dir'], config['image_name']))
-	transformed_image = transformer.preprocess('data', image)
-	net.blobs['data'].data[...] = transformed_image
-	return net, image
+	# image=caffe.io.load_image(os.path.join(config['img_dir'], config['image_name']))
+	# transformed_image = transformer.preprocess('data', image)
+	# net.blobs['data'].data[...] = transformed_image
+	# return net, image
+	return transformer, net
 
 
 def extract_detections(detections, det_score_threshold, image_height, image_width):
@@ -109,8 +113,8 @@ def apply_quad_nms(bboxes, overlap_threshold):
 				results.append(dt)
 	return results
 
-def save_and_visu(image, results, config):
-	image_name=config['image_name']
+def save_and_visu(image, results, config, image_name):
+	# image_name=config['image_name']
 	det_save_path=os.path.join(config['det_save_dir'], image_name.split('.')[0]+'.txt')
 	det_fid = open(det_save_path, 'wt')
 	if config['visu_detection']:
@@ -138,17 +142,29 @@ def save_and_visu(image, results, config):
 	det_fid.close()
 	if config['visu_detection']:
 		plt.axis('off')
-		plt.savefig(config['det_visu_path'], dpi=300)
+		plt.savefig(config['det_visu_path'] + image_name, dpi=300)
+
 
 # detection
-net, image= prepare_network(config)
-image_height, image_width, channels=image.shape
-detections = net.forward()['detection_out']
-# Parse the outputs.
-bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
-# apply non-maximum suppression
-results = apply_quad_nms(bboxes, config['overlap_threshold'])
-save_and_visu(image, results, config)
-print('detection finished')
+transformer, net = prepare_network(config)
+img_dir = "./demo_images/data/"
+for files in os.walk(img_dir):
+	for file in files[2]:
+		print(file + "-->start!")
+		time_start = time.time()
+		image_name = file
+		image = caffe.io.load_image(os.path.join(img_dir, image_name))
+		# global transformer, net
+		transformed_image = transformer.preprocess('data', image)
+		net.blobs['data'].data[...] = transformed_image
+		image_height, image_width, channels = image.shape
 
-	
+		detections = net.forward()['detection_out']
+		print 'Predict time is: {}'.format(time.time() - time_start)
+		# Parse the outputs.
+		bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
+		# apply non-maximum suppression
+		results = apply_quad_nms(bboxes, config['overlap_threshold'])
+		save_and_visu(image, results, config, image_name)
+
+print('detection finished')
