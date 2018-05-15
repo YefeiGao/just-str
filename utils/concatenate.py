@@ -12,6 +12,8 @@ def main():
     test_file = open('test.txt', 'w+')
     for files in os.walk(ann_path):
         for file in files[2]:
+            # if i > 1000:
+            #     break
             print(file + "-->start!")
             img_name = os.path.splitext(file)[0]
             info = img_path + img_name + '.jpg' + ' ' + xml_path + img_name + '.xml' + '\n'

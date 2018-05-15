@@ -6,6 +6,7 @@
 *.caffemodel
 *.t7
 .build_release
+.idea
 build
 distribute
 Makefile.config
