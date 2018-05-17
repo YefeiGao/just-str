@@ -227,9 +227,11 @@ train_transform_param = {
                 },
         'emit_constraint': {
             'emit_type': caffe_pb2.EmitConstraint.CENTER,
-            }
+            },
+        'force_color': True
         }
 test_transform_param = {
+        'force_color': True,
         'mean_value': [104, 117, 123],
         'resize_param': {
                 'prob': 1,
