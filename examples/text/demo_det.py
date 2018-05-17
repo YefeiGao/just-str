@@ -145,26 +145,30 @@ def save_and_visu(image, results, config, image_name):
 		plt.savefig(config['det_visu_path'] + image_name, dpi=300)
 
 
-# detection
-transformer, net = prepare_network(config)
-img_dir = "./demo_images/data/"
-for files in os.walk(img_dir):
-	for file in files[2]:
-		print(file + "-->start!")
-		time_start = time.time()
-		image_name = file
-		image = caffe.io.load_image(os.path.join(img_dir, image_name))
-		# global transformer, net
-		transformed_image = transformer.preprocess('data', image)
-		net.blobs['data'].data[...] = transformed_image
-		image_height, image_width, channels = image.shape
+def main():
+	# detection
+	transformer, net = prepare_network(config)
+	img_dir = "./demo_images/data/"
+	for files in os.walk(img_dir):
+		for file in files[2]:
+			print(file + "-->start!")
+			time_start = time.time()
+			image_name = file
+			image = caffe.io.load_image(os.path.join(img_dir, image_name))
+			# global transformer, net
+			transformed_image = transformer.preprocess('data', image)
+			net.blobs['data'].data[...] = transformed_image
+			image_height, image_width, channels = image.shape
 
-		detections = net.forward()['detection_out']
-		print 'Predict time is: {}'.format(time.time() - time_start)
-		# Parse the outputs.
-		bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
-		# apply non-maximum suppression
-		results = apply_quad_nms(bboxes, config['overlap_threshold'])
-		save_and_visu(image, results, config, image_name)
+			detections = net.forward()['detection_out']
+			print 'Predict time is: {}'.format(time.time() - time_start)
+			# Parse the outputs.
+			bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
+			# apply non-maximum suppression
+			results = apply_quad_nms(bboxes, config['overlap_threshold'])
+			save_and_visu(image, results, config, image_name)
 
-print('detection finished')
+	print('detection finished')
+
+if __name__ == "__main__":
+	main()
