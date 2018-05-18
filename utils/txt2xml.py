@@ -6,6 +6,7 @@ import os
 import os.path
 from PIL import Image
 import numpy as np
+import cv2
 
 global diff_cont, easy_cont
 diff_cont = 0
@@ -54,10 +55,10 @@ def orderedQuad(posList):
     dire_lb_y = (y_lb2 - y_lb1) / np.sqrt((x_lb2 - x_lb1) ** 2 + (y_lb2 - y_lb1) ** 2)
     dire_lb = [dire_lb_x, dire_lb_y]
 
-    # original point of new coordinate axis
+    # origin point of new coordinate axis
     orig_x = (x_la1 + x_la2) / 2
     orig_y = (y_la1 + y_la2) / 2
-    orignal = [orig_x, orig_y]
+    new_orign = [orig_x, orig_y]
 
     # unit vector of old coordinate
     dire_x = [1, 0]
@@ -85,69 +86,159 @@ def orderedQuad(posList):
         new_x = dire_lb
         new_y = dire_la
 
-    # ascertain vertex with its position in new coordinate
-    OP1 = list(map(lambda x: x[0] - x[1], zip([posList[0], posList[1]], orignal)))
-    if np.dot(new_x, OP1) <= 0 and np.dot(new_y, OP1) <= 0:
+    # # ascertain vertex with its position in new coordinate
+    # OP1 = list(map(lambda x: x[0] - x[1], zip([posList[0], posList[1]], orignal)))
+    # if np.dot(new_x, OP1) <= 0 and np.dot(new_y, OP1) <= 0:
+    #     orderedList[0] = posList[0]
+    #     orderedList[1] = posList[1]
+    # elif np.dot(new_x, OP1) >= 0 and np.dot(new_y, OP1) <= 0:
+    #     orderedList[2] = posList[0]
+    #     orderedList[3] = posList[1]
+    # elif np.dot(new_x, OP1) >= 0 and np.dot(new_y, OP1) >= 0:
+    #     orderedList[4] = posList[0]
+    #     orderedList[5] = posList[1]
+    # elif np.dot(new_x, OP1) <= 0 and np.dot(new_y, OP1) >= 0:
+    #     orderedList[6] = posList[0]
+    #     orderedList[7] = posList[1]
+    # else:
+    #     print('error!!!')
+    #     exit(-1)
+    #
+    # OP2 = list(map(lambda x: x[0] - x[1], zip([posList[2], posList[3]], orignal)))
+    # if np.dot(new_x, OP2) <= 0 and np.dot(new_y, OP2) <= 0:
+    #     orderedList[0] = posList[2]
+    #     orderedList[1] = posList[3]
+    # elif np.dot(new_x, OP2) >= 0 and np.dot(new_y, OP2) <= 0:
+    #     orderedList[2] = posList[2]
+    #     orderedList[3] = posList[3]
+    # elif np.dot(new_x, OP2) >= 0 and np.dot(new_y, OP2) >= 0:
+    #     orderedList[4] = posList[2]
+    #     orderedList[5] = posList[3]
+    # elif np.dot(new_x, OP2) <= 0 and np.dot(new_y, OP2) >= 0:
+    #     orderedList[6] = posList[2]
+    #     orderedList[7] = posList[3]
+    # else:
+    #     print('error!!!')
+    #     exit(-1)
+    # # OP3 = [posList[4], posList[5]] - orignal
+    # OP3 = list(map(lambda x: x[0] - x[1], zip([posList[4], posList[5]], orignal)))
+    # if np.dot(new_x, OP3) <= 0 and np.dot(new_y, OP3) <= 0:
+    #     orderedList[0] = posList[4]
+    #     orderedList[1] = posList[5]
+    # elif np.dot(new_x, OP3) >= 0 and np.dot(new_y, OP3) <= 0:
+    #     orderedList[2] = posList[4]
+    #     orderedList[3] = posList[5]
+    # elif np.dot(new_x, OP3) >= 0 and np.dot(new_y, OP3) >= 0:
+    #     orderedList[4] = posList[4]
+    #     orderedList[5] = posList[5]
+    # elif np.dot(new_x, OP3) <= 0 and np.dot(new_y, OP3) >= 0:
+    #     orderedList[6] = posList[4]
+    #     orderedList[7] = posList[5]
+    # else:
+    #     print('error!!!')
+    #     exit(-1)
+    #
+    # OP4 = list(map(lambda x: x[0] - x[1], zip([posList[6], posList[7]], orignal)))
+    # if np.dot(new_x, OP4) <= 0 and np.dot(new_y, OP4) <= 0:
+    #     orderedList[0] = posList[6]
+    #     orderedList[1] = posList[7]
+    # elif np.dot(new_x, OP4) >= 0 and np.dot(new_y, OP4) <= 0:
+    #     orderedList[2] = posList[6]
+    #     orderedList[3] = posList[7]
+    # elif np.dot(new_x, OP4) >= 0 and np.dot(new_y, OP4) >= 0:
+    #     orderedList[4] = posList[6]
+    #     orderedList[5] = posList[7]
+    # elif np.dot(new_x, OP4) <= 0 and np.dot(new_y, OP4) >= 0:
+    #     orderedList[6] = posList[6]
+    #     orderedList[7] = posList[7]
+    # else:
+    #     print('error!!!')
+    #     exit(-1)
+    # return orderedList
+
+    # New order logic using affine transform
+    # prepare src and dst points
+    pts1 = np.float32([[new_orign,
+                      list(map(lambda x: x[0] + x[1], zip(new_x, new_orign))),
+                      list(map(lambda x: x[0] + x[1], zip(new_y, new_orign)))]])
+    pts2 = np.float32([[[0, 0], [1, 0], [0, 1]]])
+    pts1 = np.float32(pts1)
+    pts2 = np.float32(pts2)
+
+    # calculate transform matrix
+    M = cv2.getAffineTransform(pts1, pts2)
+
+    # calculate axis value of vertex in new coordinate
+    pos_1 = np.array([[posList[0], posList[1]]], dtype="float32")
+    pos_1 = np.array([pos_1])
+    new_pos_1 = cv2.transform(pos_1, M)
+    if new_pos_1[0][0][0] <= 0 and new_pos_1[0][0][1] <= 0:
         orderedList[0] = posList[0]
         orderedList[1] = posList[1]
-    elif np.dot(new_x, OP1) >= 0 and np.dot(new_y, OP1) <= 0:
+    elif new_pos_1[0][0][0] >= 0 and new_pos_1[0][0][1] <= 0:
         orderedList[2] = posList[0]
         orderedList[3] = posList[1]
-    elif np.dot(new_x, OP1) >= 0 and np.dot(new_y, OP1) >= 0:
+    elif new_pos_1[0][0][0] >= 0 and new_pos_1[0][0][1] >= 0:
         orderedList[4] = posList[0]
         orderedList[5] = posList[1]
-    elif np.dot(new_x, OP1) <= 0 and np.dot(new_y, OP1) >= 0:
+    elif new_pos_1[0][0][0] <= 0 and new_pos_1[0][0][1] >= 0:
         orderedList[6] = posList[0]
         orderedList[7] = posList[1]
     else:
         print('error!!!')
         exit(-1)
 
-    OP2 = list(map(lambda x: x[0] - x[1], zip([posList[2], posList[3]], orignal)))
-    if np.dot(new_x, OP2) <= 0 and np.dot(new_y, OP2) <= 0:
+    pos_2 = np.array([[posList[2], posList[3]]], dtype="float32")
+    pos_2 = np.array([pos_2])
+    new_pos_2 = cv2.transform(pos_2, M)
+    if new_pos_2[0][0][0] <= 0 and new_pos_2[0][0][1] <= 0:
         orderedList[0] = posList[2]
         orderedList[1] = posList[3]
-    elif np.dot(new_x, OP2) >= 0 and np.dot(new_y, OP2) <= 0:
+    elif new_pos_2[0][0][0] >= 0 and new_pos_2[0][0][1] <= 0:
         orderedList[2] = posList[2]
         orderedList[3] = posList[3]
-    elif np.dot(new_x, OP2) >= 0 and np.dot(new_y, OP2) >= 0:
+    elif new_pos_2[0][0][0] >= 0 and new_pos_2[0][0][1] >= 0:
         orderedList[4] = posList[2]
         orderedList[5] = posList[3]
-    elif np.dot(new_x, OP2) <= 0 and np.dot(new_y, OP2) >= 0:
+    elif new_pos_2[0][0][0] <= 0 and new_pos_2[0][0][1] >= 0:
         orderedList[6] = posList[2]
         orderedList[7] = posList[3]
     else:
         print('error!!!')
         exit(-1)
-    # OP3 = [posList[4], posList[5]] - orignal
-    OP3 = list(map(lambda x: x[0] - x[1], zip([posList[4], posList[5]], orignal)))
-    if np.dot(new_x, OP3) <= 0 and np.dot(new_y, OP3) <= 0:
+
+    pos_3 = np.array([[posList[4], posList[5]]], dtype="float32")
+    pos_3 = np.array([pos_3])
+    new_pos_3 = cv2.transform(pos_3, M)
+    if new_pos_3[0][0][0] <= 0 and new_pos_3[0][0][1] <= 0:
         orderedList[0] = posList[4]
         orderedList[1] = posList[5]
-    elif np.dot(new_x, OP3) >= 0 and np.dot(new_y, OP3) <= 0:
+    elif new_pos_3[0][0][0] >= 0 and new_pos_3[0][0][1] <= 0:
         orderedList[2] = posList[4]
         orderedList[3] = posList[5]
-    elif np.dot(new_x, OP3) >= 0 and np.dot(new_y, OP3) >= 0:
+    elif new_pos_3[0][0][0] >= 0 and new_pos_3[0][0][1] >= 0:
         orderedList[4] = posList[4]
         orderedList[5] = posList[5]
-    elif np.dot(new_x, OP3) <= 0 and np.dot(new_y, OP3) >= 0:
+    elif new_pos_3[0][0][0] <= 0 and new_pos_3[0][0][1] >= 0:
         orderedList[6] = posList[4]
         orderedList[7] = posList[5]
     else:
         print('error!!!')
         exit(-1)
 
-    OP4 = list(map(lambda x: x[0] - x[1], zip([posList[6], posList[7]], orignal)))
-    if np.dot(new_x, OP4) <= 0 and np.dot(new_y, OP4) <= 0:
+    pos_4 = np.array([[posList[6], posList[7]]], dtype="float32")
+    pos_4 = np.array([pos_4])
+    new_pos_4 = cv2.transform(pos_4, M)
+    if new_pos_4[0][0][0] <= 0 and new_pos_4[0][0][1] <= 0:
         orderedList[0] = posList[6]
         orderedList[1] = posList[7]
-    elif np.dot(new_x, OP4) >= 0 and np.dot(new_y, OP4) <= 0:
+    elif new_pos_4[0][0][0] >= 0 and new_pos_4[0][0][1] <= 0:
         orderedList[2] = posList[6]
         orderedList[3] = posList[7]
-    elif np.dot(new_x, OP4) >= 0 and np.dot(new_y, OP4) >= 0:
+    elif new_pos_4[0][0][0] >= 0 and new_pos_4[0][0][1] >= 0:
         orderedList[4] = posList[6]
         orderedList[5] = posList[7]
-    elif np.dot(new_x, OP4) <= 0 and np.dot(new_y, OP4) >= 0:
+    elif new_pos_4[0][0][0] <= 0 and new_pos_4[0][0][1] >= 0:
         orderedList[6] = posList[6]
         orderedList[7] = posList[7]
     else:
