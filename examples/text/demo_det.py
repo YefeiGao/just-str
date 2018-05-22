@@ -20,43 +20,46 @@ import caffe
 caffe.set_device(0)
 caffe.set_mode_gpu()
 
+import cv2
+
 # global transformer
 
 config = {
 	'model_def' : './models/deploy.prototxt',
-	'model_weights' : './models/model_icdar15.caffemodel',
-	# 'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_30000.caffemodel',
+	# 'model_weights' : './models/model_icdar15.caffemodel',
+	'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_90000.caffemodel',
 	'img_dir' : './demo_images/data/',
-	'image_name' : 't01b494119fe46bdaff_new.jpg',
+	'image_name' : 'test.jpg',
 	'det_visu_path' : './demo_images/detection_result/',
 	'det_save_dir' : './demo_images/detection_result/',
 	'crop_dir' : './demo_images/crops/',
-	'input_height' : 768,
-	'input_width' : 768,
+	'input_height' : 384,
+	'input_width' : 384,
 	'overlap_threshold' : 0.2,
 	'det_score_threshold' : 0.2,
 	'visu_detection' : True,
 }
 
-def prepare_network(config):
-	net = caffe.Net(config['model_def'],	 # defines the structure of the model
-                config['model_weights'],  # contains the trained weights
-                caffe.TEST)     # use test mode (e.g., don't perform dropout)
+net = caffe.Net(config['model_def'],	 # defines the structure of the model
+			config['model_weights'],  # contains the trained weights
+			caffe.TEST)     # use test mode (e.g., don't perform dropout)
 
+def prepare_network(config):
 	transformer = caffe.io.Transformer({'data': (1,3,config['input_height'], config['input_width'])})
 	transformer.set_transpose('data', (2, 0, 1))
 	transformer.set_mean('data', np.array([104,117,123])) # mean pixel
-	transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
-	transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
+	# transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
+	# transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
 	net.blobs['data'].reshape(1,3,config['input_height'], config['input_width'])
-
+	image = cv2.imread(os.path.join(config['img_dir'], config['image_name']))
 	# image=caffe.io.load_image(os.path.join(config['img_dir'], config['image_name']))
-	# transformed_image = transformer.preprocess('data', image)
-	# net.blobs['data'].data[...] = transformed_image
+	transformed_image = transformer.preprocess('data', image)
+	net.blobs['data'].data[...] = transformed_image
+	image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 	# return net, image
-	return transformer, net
-
+	# return transformer, net
+	return image
 
 def extract_detections(detections, det_score_threshold, image_height, image_width):
 	det_conf = detections[0,0,:,2]
@@ -113,8 +116,8 @@ def apply_quad_nms(bboxes, overlap_threshold):
 				results.append(dt)
 	return results
 
-def save_and_visu(image, results, config, image_name):
-	# image_name=config['image_name']
+def save_and_visu(image, results, config):
+	image_name=config['image_name']
 	det_save_path=os.path.join(config['det_save_dir'], image_name.split('.')[0]+'.txt')
 	det_fid = open(det_save_path, 'wt')
 	if config['visu_detection']:
@@ -147,26 +150,43 @@ def save_and_visu(image, results, config, image_name):
 
 def main():
 	# detection
-	transformer, net = prepare_network(config)
-	img_dir = "./demo_images/data/"
-	for files in os.walk(img_dir):
+	# Select if multi-scale used
+	use_multi_scale = True
+	if not use_multi_scale:
+		scales = ((384, 384),)
+	else:
+		# scales = ((300, 300), (700, 700), (700, 500), (700, 300), (1600, 1600))
+		scales = ((300, 300), (700, 700), (700, 500), (700, 300))
+
+	# Process folder files
+	for files in os.walk(config['img_dir']):
 		for file in files[2]:
 			print(file + "-->start!")
-			time_start = time.time()
-			image_name = file
-			image = caffe.io.load_image(os.path.join(img_dir, image_name))
-			# global transformer, net
-			transformed_image = transformer.preprocess('data', image)
-			net.blobs['data'].data[...] = transformed_image
-			image_height, image_width, channels = image.shape
 
-			detections = net.forward()['detection_out']
-			print 'Predict time is: {}'.format(time.time() - time_start)
-			# Parse the outputs.
-			bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
-			# apply non-maximum suppression
+			# Update detect results
+			dt_results = []
+
+			# Detect in all scales
+			for scale in scales:
+				print(scale)
+				config['input_height'] = scale[0]
+				config['input_width'] = scale[1]
+				config['image_name'] = file
+				image = prepare_network(config)
+				image_height, image_width, channels = image.shape
+
+				# Forward pass.
+				detections = net.forward()['detection_out']
+
+				# Parse the outputs.
+				bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
+				dt_results.append(bboxes)
+
+			# Apply non-maximum suppression
 			results = apply_quad_nms(bboxes, config['overlap_threshold'])
-			save_and_visu(image, results, config, image_name)
+
+			# Visualization and result saving
+			save_and_visu(image, results, config)
 
 	print('detection finished')
 
