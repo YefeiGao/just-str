@@ -22,13 +22,18 @@ caffe.set_mode_gpu()
 
 import cv2
 
+# CRNN module
+sys.path.append(caffe_root)
+from crnnport import *
+model,converter = crnnSource()
+
 # global transformer
 
 config = {
 	'model_def' : './models/deploy.prototxt',
 	# 'model_weights' : './models/model_icdar15.caffemodel',
-	'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_90000.caffemodel',
-	'img_dir' : './demo_images/data/',
+	'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_120000.caffemodel',
+	'img_dir' : './demo_images/test-recog/',
 	'image_name' : 'test.jpg',
 	'det_visu_path' : './demo_images/detection_result/',
 	'det_save_dir' : './demo_images/detection_result/',
@@ -53,6 +58,18 @@ def prepare_network(config):
 
 	net.blobs['data'].reshape(1,3,config['input_height'], config['input_width'])
 	image = cv2.imread(os.path.join(config['img_dir'], config['image_name']))
+
+	# # Resize small image with padding
+	# sp = image.shape
+	# HEIGHT = config['input_height']
+	# WIDTH = config['input_width']
+	# if sp[0] < HEIGHT or sp[1] < WIDTH:
+	# 	top = int(max(HEIGHT - sp[0], 0) / 2)
+	# 	bottom = int(max(HEIGHT - sp[0], 0) / 2)
+	# 	left = int(max(WIDTH - sp[1], 0) / 2)
+	# 	right = int(max(WIDTH - sp[1], 0) / 2)
+	# 	image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)
+
 	# image=caffe.io.load_image(os.path.join(config['img_dir'], config['image_name']))
 	transformed_image = transformer.preprocess('data', image)
 	net.blobs['data'].data[...] = transformed_image
@@ -151,12 +168,12 @@ def save_and_visu(image, results, config):
 def main():
 	# detection
 	# Select if multi-scale used
-	use_multi_scale = True
+	use_multi_scale = False
 	if not use_multi_scale:
 		scales = ((384, 384),)
 	else:
 		# scales = ((300, 300), (700, 700), (700, 500), (700, 300), (1600, 1600))
-		scales = ((300, 300), (700, 700), (700, 500), (700, 300))
+		scales = ((384, 384), (1000, 1000))
 
 	# Process folder files
 	for files in os.walk(config['img_dir']):
@@ -180,13 +197,17 @@ def main():
 
 				# Parse the outputs.
 				bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
-				dt_results.append(bboxes)
+				# dt_results.append(bboxes)
+				dt_results.extend(bboxes)
 
 			# Apply non-maximum suppression
-			results = apply_quad_nms(bboxes, config['overlap_threshold'])
+			dt_nms_results = apply_quad_nms(dt_results, config['overlap_threshold'])
 
 			# Visualization and result saving
-			save_and_visu(image, results, config)
+			save_and_visu(image, dt_nms_results, config)
+
+			# Apply text recognition with crnn model
+			crnnRec(model, converter, image, dt_nms_results)
 
 	print('detection finished')
 
