@@ -42,8 +42,8 @@ config = {
 	'crop_dir' : './demo_images/crops/',
 	'input_height' : 384,
 	'input_width' : 384,
-	'overlap_threshold' : 0.2,
-	'det_score_threshold' : 0.2,
+	'overlap_threshold' : 0.1,
+	'det_score_threshold' : 0.25,
 	'visu_detection' : True,
 }
 
@@ -135,7 +135,7 @@ def apply_quad_nms(bboxes, overlap_threshold):
 				results.append(dt[:-1])
 	return results
 
-def save_and_visu(image, results, config):
+def save_and_visu(image, dt_results, reco_results, config):
 	image_name=config['image_name']
 	det_save_path=os.path.join(config['det_save_dir'], image_name.split('.')[0]+'.txt')
 	det_fid = open(det_save_path, 'wt')
@@ -144,7 +144,7 @@ def save_and_visu(image, results, config):
 		plt.clf()
 		plt.imshow(image)
 		currentAxis = plt.gca()
-	for result in results:
+	for result in dt_results:
 		score = result[-1]
 		x1 = result[0]
 		y1 = result[1]
@@ -170,21 +170,17 @@ def save_and_visu(image, results, config):
 def main():
 	# detection
 	# Select if multi-scale used
-	use_multi_scale = False
+	use_multi_scale = True
 	if not use_multi_scale:
 		scales = ((384, 384),)
 	else:
 		# scales = ((300, 300), (700, 700), (700, 500), (700, 300), (1600, 1600))
-		scales = ((384, 384), (1000, 1000))
+		scales = ((384, 384), (640, 640))
 
 	# Process folder files
 	for files in os.walk(config['img_dir']):
 		for file in files[2]:
 			print(file + "-->start!")
-
-			# Text recognition result
-			text_rec_res = {}
-			text_rec_res["file_name"] = file
 
 			# Update detect results
 			dt_results = []
@@ -208,18 +204,23 @@ def main():
 
 			# Apply non-maximum suppression
 			dt_nms_results = apply_quad_nms(dt_results, config['overlap_threshold'])
-			text_rec_res["polygons"] = dt_nms_results
-			# Visualization and result saving
-			save_and_visu(image, dt_nms_results, config)
-
 			# Apply text recognition with crnn model
 			reco_results = crnnRec(model, converter, image, dt_nms_results)
+
+			# Visualization and result saving
+			save_and_visu(image, dt_nms_results, reco_results, config)
+
+			# Text recognition result
+			text_rec_res = {}
+			text_rec_res["file_name"] = file
+			text_rec_res["polygons"] = dt_nms_results
 			text_rec_res["text"] = reco_results
-			print(config["reco_save_dir"] + file.split('.')[0] + '.json')
-			with open(config["reco_save_dir"] + file.split('.')[0] + '.json', "w") as f:
+
+			json_save_path = os.path.join(config['reco_save_dir'], file.split('.')[0] + '.json')
+			with open(json_save_path, "w") as f:
 				json.dump(text_rec_res, f)
 
-	print('detection finished')
+	print('detection & recognition finished')
 
 if __name__ == "__main__":
 	main()
