@@ -180,7 +180,7 @@ def main():
 
 				# Parse the outputs.
 				bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
-				dt_results.append(bboxes)
+				dt_results.extend(bboxes)
 
 			# Apply non-maximum suppression
 			results = apply_quad_nms(bboxes, config['overlap_threshold'])
