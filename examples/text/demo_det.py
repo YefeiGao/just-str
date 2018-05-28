@@ -22,6 +22,8 @@ caffe.set_device(0)
 caffe.set_mode_gpu()
 
 import cv2
+from PIL import Image, ImageFont, ImageDraw
+font = ImageFont.truetype('simhei.ttf', size=16)
 
 # CRNN module
 sys.path.append(caffe_root)
@@ -136,37 +138,14 @@ def apply_quad_nms(bboxes, overlap_threshold):
 	return results
 
 def save_and_visu(image, dt_results, reco_results, config):
-	image_name=config['image_name']
-	det_save_path=os.path.join(config['det_save_dir'], image_name.split('.')[0]+'.txt')
-	det_fid = open(det_save_path, 'wt')
-	if config['visu_detection']:
-		# visulization
-		plt.clf()
-		plt.imshow(image)
-		currentAxis = plt.gca()
-	for result in dt_results:
-		score = result[-1]
-		x1 = result[0]
-		y1 = result[1]
-		x2 = result[2]
-		y2 = result[3]
-		x3 = result[4]
-		y3 = result[5]
-		x4 = result[6]
-		y4 = result[7]
-		result_str=str(x1)+','+str(y1)+','+str(x2)+','+str(y2)+','+str(x3)+','+str(y3)+','+str(x4)+','+str(y4)+','+str(score)+'\r\n'
-		det_fid.write(result_str)
-		if config['visu_detection']:
-			quad = np.array([[x1,y1],[x2,y2],[x3,y3],[x4,y4]])
-			color_quad='r'
-			currentAxis.add_patch(plt.Polygon(quad, fill=False, edgecolor=color_quad, linewidth=2))
-
-	det_fid.close()
-	if config['visu_detection']:
-		plt.axis('off')
-		save_time = time.time()
-		plt.savefig(config['det_visu_path'] + image_name, dpi=300)
-		print('save time is: {}'.format(time.time() - save_time) )
+	image_name = config['image_name']
+	img_pil = Image.fromarray(image)
+	draw = ImageDraw.Draw(img_pil)
+	for i, result in enumerate(dt_results):
+		draw.polygon(tuple(result), outline='red')
+		draw.text(tuple(result[-2:]), reco_results[i], font=font, fill=(255, 0, 0))
+	img_cv = cv2.cvtColor(np.asarray(img_pil), cv2.COLOR_RGB2BGR)
+	cv2.imwrite(config['det_visu_path'] + image_name, img_cv)
 
 def main():
 	frd_time = 0
