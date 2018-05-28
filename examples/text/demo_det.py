@@ -24,7 +24,7 @@ import cv2
 
 # CRNN module
 sys.path.append(caffe_root)
-from crnnport import *
+from crnn.crnnport import *
 model,converter = crnnSource()
 
 # global transformer
