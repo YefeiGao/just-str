@@ -164,13 +164,18 @@ def save_and_visu(image, dt_results, reco_results, config):
 	det_fid.close()
 	if config['visu_detection']:
 		plt.axis('off')
+		save_time = time.time()
 		plt.savefig(config['det_visu_path'] + image_name, dpi=300)
-
+		print('save time is: {}'.format(time.time() - save_time) )
 
 def main():
-	# detection
+	frd_time = 0
+	nms_time = 0
+	recog_time = 0
+	total_time = 0
+
 	# Select if multi-scale used
-	use_multi_scale = True
+	use_multi_scale = False
 	if not use_multi_scale:
 		scales = ((384, 384),)
 	else:
@@ -178,6 +183,7 @@ def main():
 		scales = ((384, 384), (640, 640))
 
 	# Process folder files
+	total_time_st = time.time()
 	for files in os.walk(config['img_dir']):
 		for file in files[2]:
 			print(file + "-->start!")
@@ -195,7 +201,9 @@ def main():
 				image_height, image_width, channels = image.shape
 
 				# Forward pass.
+				tmp_time = time.time()
 				detections = net.forward()['detection_out']
+				frd_time += time.time() - tmp_time
 
 				# Parse the outputs.
 				bboxes = extract_detections(detections, config['det_score_threshold'], image_height, image_width)
@@ -203,9 +211,14 @@ def main():
 				dt_results.extend(bboxes)
 
 			# Apply non-maximum suppression
+			tmp_time = time.time()
 			dt_nms_results = apply_quad_nms(dt_results, config['overlap_threshold'])
+			nms_time += time.time() - tmp_time
+
 			# Apply text recognition with crnn model
+			tmp_time = time.time()
 			reco_results = crnnRec(model, converter, image, dt_nms_results)
+			recog_time += time.time() - tmp_time
 
 			# Visualization and result saving
 			save_and_visu(image, dt_nms_results, reco_results, config)
@@ -219,8 +232,12 @@ def main():
 			json_save_path = os.path.join(config['reco_save_dir'], file.split('.')[0] + '.json')
 			with open(json_save_path, "w") as f:
 				json.dump(text_rec_res, f)
-
+	total_time = time.time() - total_time_st
 	print('detection & recognition finished')
+	print('Average forward time is: {}'.format(frd_time / 199))
+	print('Average nms time is: {}'.format(nms_time / 199))
+	print('Average recog time is: {}'.format(recog_time / 199))
+	print('Total time is: {}'.format(total_time))
 
 if __name__ == "__main__":
 	main()
