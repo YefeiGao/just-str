@@ -50,18 +50,23 @@ def crnnSource():
 
 def crnnRec(model, converter, im, text_recs):
     index = 0
+    recog_results = []
     for rec in text_recs:
         pt1 = (rec[0], rec[1])
         pt2 = (rec[2], rec[3])
-        # pt3 = (rec[6],rec[7])
-        # pt4 = (rec[4],rec[5])
         pt3 = (rec[4], rec[5])
         pt4 = (rec[6], rec[7])
-        print pt1, pt2, pt3, pt4
+        # print pt1, pt2, pt3, pt4
         partImg = dumpRotateImage(im, degrees(atan2(pt2[1] - pt1[1], pt2[0] - pt1[0])), pt1, pt2, pt3, pt4)
         # mahotas.imsave('%s.jpg'%index, partImg)
 
-        image = Image.fromarray(partImg).convert('L')
+        try:
+            image = Image.fromarray(partImg).convert('L')
+        except:
+            recog_results.append("###")
+            index = index + 1
+            continue
+
         # height,width,channel=partImg.shape[:3]
         # print(height,width,channel)
         # print(image.size)
@@ -77,21 +82,19 @@ def crnnRec(model, converter, im, text_recs):
         image = image.view(1, *image.size())
         image = Variable(image)
         model.eval()
-        preds = model(image)
-        print preds
-        _, preds = preds.max(2)
-        # print preds
-        # preds = preds.squeeze(2)
-        preds = preds.transpose(1, 0).contiguous().view(-1)
-        preds_size = Variable(torch.IntTensor([preds.size(0)]))
-        raw_pred = converter.decode(preds.data, preds_size.data, raw=True)
-        sim_pred = converter.decode(preds.data, preds_size.data, raw=False)
-        print('%-20s => %-20s' % (raw_pred, sim_pred))
-        print(index)
-        print(sim_pred)
+        try:
+            preds = model(image)
+            _, preds = preds.max(2)
+            # preds = preds.squeeze(2)
+            preds = preds.transpose(1, 0).contiguous().view(-1)
+            preds_size = Variable(torch.IntTensor([preds.size(0)]))
+            raw_pred = converter.decode(preds.data, preds_size.data, raw=True)
+            sim_pred = converter.decode(preds.data, preds_size.data, raw=False)
+            print(index)
+            print(sim_pred)
+            print('%-20s => %-20s \n' % (raw_pred, sim_pred))
+            recog_results.append(sim_pred)
+        except:
+            recog_results.append("###")
         index = index + 1
-
-
-
-
-
+    return recog_results

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 # %matplotlib inline
 import time
 import math
+import json
 from nms import nms
 from crop_image import crop_image
 
@@ -33,10 +34,11 @@ config = {
 	'model_def' : './models/deploy.prototxt',
 	# 'model_weights' : './models/model_icdar15.caffemodel',
 	'model_weights': './models/VGGNet/text/text_polygon_precise_fix_order_384x384/VGG_text_text_polygon_precise_fix_order_384x384_iter_120000.caffemodel',
-	'img_dir' : './demo_images/test-recog/',
+	'img_dir' : './demo_images/data/',
 	'image_name' : 'test.jpg',
 	'det_visu_path' : './demo_images/detection_result/',
 	'det_save_dir' : './demo_images/detection_result/',
+	'reco_save_dir' : './demo_images/recognition_result/',
 	'crop_dir' : './demo_images/crops/',
 	'input_height' : 384,
 	'input_width' : 384,
@@ -130,7 +132,7 @@ def apply_quad_nms(bboxes, overlap_threshold):
 	for k,dt in enumerate(dt_lines):
 		if nms_flag[k]:
 			if dt not in results:
-				results.append(dt)
+				results.append(dt[:-1])
 	return results
 
 def save_and_visu(image, results, config):
@@ -180,6 +182,10 @@ def main():
 		for file in files[2]:
 			print(file + "-->start!")
 
+			# Text recognition result
+			text_rec_res = {}
+			text_rec_res["file_name"] = file
+
 			# Update detect results
 			dt_results = []
 
@@ -202,12 +208,16 @@ def main():
 
 			# Apply non-maximum suppression
 			dt_nms_results = apply_quad_nms(dt_results, config['overlap_threshold'])
-
+			text_rec_res["polygons"] = dt_nms_results
 			# Visualization and result saving
 			save_and_visu(image, dt_nms_results, config)
 
 			# Apply text recognition with crnn model
-			crnnRec(model, converter, image, dt_nms_results)
+			reco_results = crnnRec(model, converter, image, dt_nms_results)
+			text_rec_res["text"] = reco_results
+			print(config["reco_save_dir"] + file.split('.')[0] + '.json')
+			with open(config["reco_save_dir"] + file.split('.')[0] + '.json', "w") as f:
+				json.dump(text_rec_res, f)
 
 	print('detection finished')
 
